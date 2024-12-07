@@ -5,6 +5,7 @@ use const_format::concatcp;
 use itertools::Itertools;
 use std::fs::File;
 use std::io::Read;
+use tokio::task::JoinSet;
 
 const DAY: &str = "06";
 const INPUT_FILE: &str = concatcp!("input/", DAY, ".txt");
@@ -21,25 +22,26 @@ const TEST: &str = "\
 ......#...
 ";
 
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
     start_day(DAY);
 
     //region Part 1
     println!("=== Part 1 ===");
 
-    fn part1(input: &str) -> Result<usize> {
+    async fn part1(input: &str) -> Result<usize> {
         let map = parse(input)?;
-        let path = navigate_check_cycles(&map, false)?;
+        let path = navigate_grid(map, false, 0).await?;
         Ok(path.points.len())
     }
 
-    fn part2(input: &str) -> Result<usize> {
+    async fn part2(input: &str) -> Result<usize> {
         let mut map = parse(input)?;
-        let cycles = calculate_cycles(&mut map)?;
+        let cycles = test_obstacles(&mut map).await?;
         Ok(cycles)
     }
 
-    let result = part1(TEST)?;
+    let result = part1(TEST).await?;
     println!("Test Result 1 = {}", result);
     assert_eq!(41, result);
 
@@ -48,16 +50,16 @@ fn main() -> Result<()> {
     input_file.read_to_end(&mut buffer)?;
     let input = String::from_utf8_lossy(&buffer);
 
-    let result = time_snippet!(part1(&input)?);
+    let result = time_snippet!(part1(&input).await?);
     println!("Result 1 = {}", result);
 
     println!("=== Part 2 ===");
 
-    let result = part2(TEST)?;
+    let result = part2(TEST).await?;
     println!("Test Result 2 = {}", result);
     assert_eq!(6, result);
 
-    let result = time_snippet!(part2(&input)?);
+    let result = time_snippet!(part2(&input).await?;);
     println!("Result 2 = {}", result);
 
     Ok(())
@@ -90,7 +92,7 @@ struct Path {
     cycle: bool,
 }
 
-fn calculate_cycles(map: &mut [Vec<char>]) -> Result<usize> {
+async fn test_obstacles(map: &Vec<Vec<char>>) -> Result<usize> {
     let guard = find_guard(map)?;
     let mut exclusion = Point {
         x: guard.x,
@@ -113,7 +115,10 @@ fn calculate_cycles(map: &mut [Vec<char>]) -> Result<usize> {
         }
     }
 
-    let mut cycle_count = 0;
+    let mut set = JoinSet::new();
+
+    let mut current_map = 0;
+
     for r in 0..map.len() {
         for c in 0..map[r].len() {
             if guard.x == r && guard.y == c {
@@ -122,28 +127,36 @@ fn calculate_cycles(map: &mut [Vec<char>]) -> Result<usize> {
             if exclusion.x == r && exclusion.y == c {
                 continue;
             }
-            
+
             let tile = map[r][c];
             if tile != '.' {
                 continue;
             }
-            
+
+            let mut map = map.clone();
             map[r][c] = '#';
 
-            let path = navigate_check_cycles(map, true)?;
-            if path.cycle {
-                cycle_count += 1;
-            }
+            current_map += 1;
 
-            map[r][c] = '.';
+            set.spawn(navigate_grid(map, true, current_map));
         }
     }
 
-    Ok(cycle_count)
+    let output = set.join_all().await;
+
+    let mut total_cycles = 0;
+    for path in output {
+        let path = path?;
+        if path.cycle {
+            total_cycles += 1;
+        }
+    }
+
+    Ok(total_cycles)
 }
 
-fn navigate_check_cycles(map: &[Vec<char>], break_on_cycle: bool) -> Result<Path> {
-    let mut guard = find_guard(map)?;
+async fn navigate_grid(map: Vec<Vec<char>>, break_on_cycle: bool, map_name: usize) -> Result<Path> {
+    let mut guard = find_guard(&map)?;
     let mut points: Vec<Point> = Vec::new();
     points.push(Point {
         x: guard.x,
@@ -151,8 +164,14 @@ fn navigate_check_cycles(map: &[Vec<char>], break_on_cycle: bool) -> Result<Path
         direction: guard.direction.clone(),
     });
 
+    let print = |text: String| {
+        if map_name % 100 == 0 {
+            println!("{}", text)
+        }
+    };
+
     loop {
-        let position = move_to_next_position(map, &guard)?;
+        let position = move_to_next_position(&map, &guard).await?;
         if position.next_will_be_outside {
             break;
         }
@@ -165,9 +184,13 @@ fn navigate_check_cycles(map: &[Vec<char>], break_on_cycle: bool) -> Result<Path
 
             if find_result.is_some() {
                 let point: &mut Point = find_result.unwrap();
-                    if break_on_cycle && point.direction == guard.direction {
-                        return Ok(Path { cycle: true, points });
-                    }
+                if break_on_cycle && point.direction == guard.direction {
+                    print(format!("Map {map_name} is a cycle."));
+                    return Ok(Path {
+                        cycle: true,
+                        points,
+                    });
+                }
                 point.direction = guard.direction.clone();
             } else {
                 points.push(Point {
@@ -194,51 +217,14 @@ fn navigate_check_cycles(map: &[Vec<char>], break_on_cycle: bool) -> Result<Path
         }
     }
 
-    Ok(Path { cycle: false, points })
+    print(format!("Map {map_name} completed successfully."));
+    Ok(Path {
+        cycle: false,
+        points,
+    })
 }
 
-// fn navigate(map: &[Vec<char>]) -> Result<Vec<Point>> {
-//
-//     let mut guard = find_guard(map)?;
-//     let mut points: Vec<Point> = Vec::new();
-//     points.push(Point{x: guard.position_x,y: guard.position_y });
-//
-//     loop {
-//         let position = move_to_next_position(map, &guard)?;
-//         if position.next_will_be_outside {
-//             break;
-//         }
-//
-//         if position.moved {
-//             guard.position_y = position.next_position_y;
-//             guard.position_x = position.next_position_x;
-//
-//             if !points.iter().any(|p| p.x == guard.position_x && p.y == guard.position_y) {
-//                 points.push(Point{x: guard.position_x,y: guard.position_y });
-//             }
-//
-//         } else {
-//             match guard.direction {
-//                 Direction::Up => {
-//                     guard.direction = Direction::Right;
-//                 }
-//                 Direction::Down => {
-//                     guard.direction = Direction::Left;
-//                 }
-//                 Direction::Left => {
-//                     guard.direction = Direction::Up;
-//                 }
-//                 Direction::Right => {
-//                     guard.direction = Direction::Down;
-//                 }
-//             };
-//         }
-//     }
-//
-//     Ok(points)
-// }
-
-fn move_to_next_position(map: &[Vec<char>], guard: &Point) -> Result<Position> {
+async fn move_to_next_position(map: &[Vec<char>], guard: &Point) -> Result<Position> {
     let current_pos_x = guard.x;
     let current_pos_y = guard.y;
 
