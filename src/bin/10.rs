@@ -93,7 +93,7 @@ async fn process_map(map: &[Vec<u32>], total_trails: bool) -> u32 {
     let map_width = map[0].len();
     let map_height = map.len();
 
-    let mut total = 0;
+    let mut total = 0u32;
 
     for (x, l) in map.iter().enumerate() {
         for (y, v) in l.iter().enumerate() {
@@ -102,7 +102,7 @@ async fn process_map(map: &[Vec<u32>], total_trails: bool) -> u32 {
             }
 
             if total_trails {
-                total += step_count(map, map_height, map_width, x, y).await;
+                total += step(map, map_height, map_width, x, y).await.len() as u32;
             } else {
                 let trails = step(map, map_height, map_width, x, y).await;
                 let mut nine_points: HashMap<Point, u32> = HashMap::new();
@@ -116,44 +116,6 @@ async fn process_map(map: &[Vec<u32>], total_trails: bool) -> u32 {
     }
 
     total
-}
-
-#[async_recursion]
-async fn step_count(
-    map: &[Vec<u32>],
-    map_height: usize,
-    map_width: usize,
-    x: usize,
-    y: usize,
-) -> u32 {
-    let value = map[x][y];
-    if value == 9 {
-        return 1;
-    }
-
-    let diff_is_acceptable = |other: u32| -> bool { other > value && other.abs_diff(value) == 1 };
-
-    let mut total_trails = 0;
-
-    // clockwise check
-    if x > 0 && diff_is_acceptable(map[x - 1][y]) {
-        // top
-        total_trails += step_count(map, map_height, map_width, x - 1, y).await;
-    }
-    if y < (map_width - 1) && diff_is_acceptable(map[x][y + 1]) {
-        // right
-        total_trails += step_count(map, map_height, map_width, x, y + 1).await;
-    }
-    if x < (map_height - 1) && diff_is_acceptable(map[x + 1][y]) {
-        // bottom
-        total_trails += step_count(map, map_height, map_width, x + 1, y).await;
-    }
-    if y > 0 && diff_is_acceptable(map[x][y - 1]) {
-        // left
-        total_trails += step_count(map, map_height, map_width, x, y - 1).await;
-    }
-
-    total_trails
 }
 
 #[async_recursion]
