@@ -50,13 +50,13 @@ v^^>>><<^^<>>^v^<v^vv<>v^<<>^<^v^v><^<<<><<^<v><v<>vv>>v><v^<vv<>v^<<^
 const TEST3: &str = "\
 #######
 #...#.#
+#....#
+#..@O.#
+#...OO#
 #.....#
-#..OO.#
-#..O..#
-#..@..#
 #######
 
-^
+>>^>v
 ";
 
 #[tokio::main]
@@ -227,8 +227,7 @@ fn move_box_pile(warehouse: &mut Warehouse, direction: char, row: usize, column:
 
             if warehouse.map[row][column] == '['
                 && (can_box_be_moved(warehouse, row, column, direction)
-                    || (move_box_pile(warehouse, direction, row - 1, column)
-                        && move_box_pile(warehouse, direction, row - 1, column + 1)))
+                    || move_box_pile(warehouse, direction, row - 1, column))
             {
                 warehouse.map[row - 1][column] = '[';
                 warehouse.map[row - 1][column + 1] = ']';
@@ -239,8 +238,7 @@ fn move_box_pile(warehouse: &mut Warehouse, direction: char, row: usize, column:
             }
 
             if can_box_be_moved(warehouse, row, column, direction)
-                || (move_box_pile(warehouse, direction, row - 1, column)
-                    && move_box_pile(warehouse, direction, row - 1, column - 1))
+                || move_box_pile(warehouse, direction, row - 1, column)
             {
                 warehouse.map[row - 1][column] = ']';
                 warehouse.map[row - 1][column - 1] = '[';
@@ -266,8 +264,7 @@ fn move_box_pile(warehouse: &mut Warehouse, direction: char, row: usize, column:
 
             if warehouse.map[row][column] == '['
                 && (can_box_be_moved(warehouse, row, column, direction)
-                    || (move_box_pile(warehouse, direction, row + 1, column)
-                        && move_box_pile(warehouse, direction, row + 1, column + 1)))
+                    || move_box_pile(warehouse, direction, row + 1, column))
             {
                 warehouse.map[row + 1][column] = '[';
                 warehouse.map[row + 1][column + 1] = ']';
@@ -278,8 +275,7 @@ fn move_box_pile(warehouse: &mut Warehouse, direction: char, row: usize, column:
             }
 
             if can_box_be_moved(warehouse, row, column, direction)
-                || (move_box_pile(warehouse, direction, row + 1, column)
-                    && move_box_pile(warehouse, direction, row + 1, column - 1))
+                || move_box_pile(warehouse, direction, row + 1, column)
             {
                 warehouse.map[row + 1][column] = ']';
                 warehouse.map[row + 1][column - 1] = '[';
