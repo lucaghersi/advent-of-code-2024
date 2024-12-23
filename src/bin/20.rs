@@ -1,5 +1,5 @@
 use adv_code_2024::start_day;
-use anyhow::{Result};
+use anyhow::Result;
 use code_timing_macros::time_snippet;
 use colored::Colorize;
 use const_format::concatcp;
@@ -286,7 +286,7 @@ impl Grid {
 
         savings.values().sum()
     }
-    
+
     async fn a_star_search(&self, cheat_point: Option<&Point>) -> Option<(Vec<Point>, u32)> {
         let mut open_set = BinaryHeap::new();
         open_set.push(Node {
